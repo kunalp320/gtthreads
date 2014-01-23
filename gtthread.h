@@ -1,10 +1,12 @@
-fndef __GTTHREAD_H
+#ifndef __GTTHREAD_H
 #define __GTTHREAD_H
+
 
 /* Must be called before any of the below functions. Failure to do so may
     * result in undefined behavior. 'period' is the scheduling quantum (interval)
      * in microseconds (i.e., 1/1000000 sec.). */
 void gtthread_init(long period);
+
 
 /* see man pthread_create(3); the attr parameter is omitted, and this should
     * behave as if attr was NULL (i.e., default attributes) */

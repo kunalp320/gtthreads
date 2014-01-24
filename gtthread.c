@@ -30,7 +30,12 @@ void gtthread_init(long period) {
 	timer.it_value.tv_sec = 0;
 	timer.it_value.tv_usec = quantum;
 	timer.it_interval = timer.it_value;
-		 
+
+	sa_sigaction = schedule_handler;
+	sa_flags = SA_RESTART | SA_SIGINFO;
+	sigemptyset(&sa_sigaction.sa_mask);
+
+
 }
 int gtthread_equals(gtthread_t t1, gtthread_t t2) {
 	return t1==t2 ? 1:0;

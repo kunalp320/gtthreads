@@ -17,12 +17,12 @@ static int i = 0; /*For loop counter */
 static long quantum;
 struct itimerval timer;
 
-static int next_thread;
+static int number_current_threads;
 static int current_thread;
 
 void gtthread_init(long period) {
 	quantum = period;
-	
+
 	for(i = 0; i<MAX_THREAD_SIZE; i++) {
 		threads[i].gtthread_id = i;
 	}
@@ -37,6 +37,34 @@ void gtthread_init(long period) {
 
 
 }
+void scheduler() {
+	/*Gets the next thread */
+	current_thread = (current_thread +1) % number_current_threads;
+
+
+	
+
+
+}
+void schedule_handler() {
+	/*Turn off timer while you change threads */
+	timer.it_value = 0;
+	timer.it_interval = timer.it_value;
+	/* Need to stop the current thread and begin the next thread */
+	scheduler();
+
+	
+	/*Restart the timer */
+	timer.it_value.tv_usec = quantum;
+	timer.it_interval = timer.it_value;
+	sa_sigaction = schedule_handler;
+	sa_flags = SA_RESTART | SA_SIGINFO;
+	sigemptyset(&sa_sigaction.sa_mask);
+
+
+
+}
+
 int gtthread_equals(gtthread_t t1, gtthread_t t2) {
 	return t1==t2 ? 1:0;
 }

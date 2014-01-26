@@ -16,7 +16,6 @@ typedef struct {
 }gtthreads;
 
 gtthreads  threads[MAX_THREAD_SIZE];
-int [] id_map = new int[MAX_THREAD_SIZE];
 
 static int i = 0; /*For loop counter */
 static long quantum;

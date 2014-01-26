@@ -87,7 +87,6 @@ void gtthread_exit(void *ret_val) {
 }
 int gtthread_cancel(gtthread_t thread_id) {
 
-	number_current_threads--;
 	int index = 0;
 	int found = 0;
 	for(i = 0; i<number_total_threads; i++ ) {
@@ -100,6 +99,7 @@ int gtthread_cancel(gtthread_t thread_id) {
 	if(found) {
 		threads[index].finished = 1;
 		free(threads[index].context.uc_stack.ss_sp);
+		number_total_threads--;
 		return 1; 
 	}
 	else {
@@ -124,6 +124,10 @@ int gtthread_join(gtthread_t thread, void **status) {
 		}
 	}
 	if(found && status != NULL) {
+		while(true) {
+			if(threads[index].finished == 1) 
+				break;
+		}
 		status = threads[index].return_value;
 		return 1;
 	}

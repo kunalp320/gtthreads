@@ -79,7 +79,8 @@ int gtthread_cancel(gtthread_t thread_id) {
 
 	number_current_threads--;
 	threads[thread_id].finished = 1;
-	free(threads[thread_id]);
+	free(threads[thread_id].context.uc_stack.ss_sp);
+	threads[thread_id].finished = 1;
 	return 1;
 
 }
@@ -89,7 +90,7 @@ gtthread gtthread_self(void) {
 
 int gtthread_join(gtthread_t thread, void **status) {
 	while(true) {
-		if(threads[(int)thread] == 1) {
+		if(threads[(int)thread].finished == 1) {
 			break;
 		}
 	}

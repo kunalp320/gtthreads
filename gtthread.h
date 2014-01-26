@@ -3,6 +3,14 @@
 
 typedef unsigned long int gtthread_t; 
 
+typedef struct {
+
+	int count;
+	int lock;
+	int unlock;
+
+}gtthread_mutex_t
+
 /* Must be called before any of the below functions. Failure to do so may
     * result in undefined behavior. 'period' is the scheduling quantum (interval)
      * in microseconds (i.e., 1/1000000 sec.). */

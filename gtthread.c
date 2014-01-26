@@ -80,9 +80,8 @@ int gtthread_cancel(gtthread_t thread_id) {
 	number_current_threads--;
 	threads[thread_id].finished = 1;
 	free(threads[thread_id].context.uc_stack.ss_sp);
-	threads[thread_id].finished = 1;
-	return 1;
 
+	return 1;
 }
 gtthread gtthread_self(void) {
 	return  threads[current_thread].gtthread_id;

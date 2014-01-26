@@ -1,6 +1,8 @@
 #include <gtthread.h>
 #include <ucontext.h>
 #include <sys/time.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #define MAX_THREAD_SIZE 20 /* Number of threads that can co-exist */
 #define STACKSIZE 1024

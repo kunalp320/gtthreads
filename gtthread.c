@@ -9,6 +9,7 @@ typedef struct {
 	gtthread_t gtthread_id;
 	void *return_value;
 	ucontext_t context;
+	int finished;
 
 
 }thread_info;
@@ -26,6 +27,7 @@ void gtthread_init(long period) {
 
 	for(i = 0; i<MAX_THREAD_SIZE; i++) {
 		threads[i].gtthread_id = i;
+		threads[i].finished = 0;
 	}
 
 	timer.it_value.tv_sec = 0;
@@ -76,7 +78,26 @@ void gtthread_exit(void *ret_val) {
 int gtthread_cancel(gtthread_t thread_id) {
 
 	number_current_threads--;
+	threads[thread_id].finished = 1;
 	free(threads[thread_id]);
 	return 1;
 
 }
+gtthread gtthread_self(void) {
+	return  threads[current_thread].gtthread_id;
+}
+
+int gtthread_join(gtthread_t thread, void **status) {
+	while(true) {
+		if(threads[(int)thread] == 1) {
+			break;
+		}
+	}
+	if(status != NULL) {
+		status = threads[(int)thread].return_value;
+	}
+	return;
+}
+
+
+

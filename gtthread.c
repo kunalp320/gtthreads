@@ -15,8 +15,9 @@ typedef struct {
 
 }gtthreads;
 
-gtthreads  threads[MAX_THREAD_SIZE];
+gtthreads threads[MAX_THREAD_SIZE];
 
+ucontext_t context_link;
 static int i = 0; /*For loop counter */
 static long quantum;
 struct itimerval timer;
@@ -33,7 +34,6 @@ void gtthread_init(long period) {
 	for(i = 0; i<MAX_THREAD_SIZE; i++) {
 		threads[i].gtthread_id = -1;
 		threads[i].finished = 0;
-		id_map[i] = 0;
 	}
 
 	timer.it_value.tv_sec = 0;
@@ -132,7 +132,7 @@ int gtthread_join(gtthread_t thread, void **status) {
 		return 1;
 	}
 	else {
-		printf("Cannot join a thread that doesn't exit \n");
+		printf("Cannot join a thread that doesn't exit or with a NULL pointer \n");
 		exit(0);
 	}
 	return 0;
@@ -151,10 +151,12 @@ int gtthread_create(gtthread_t *thread, void *(*start_routine)(void *), void *ar
 		}
 	}
 	if(possible) {
-		threads[index].context.uc_stack.ss_sp = malloc(STACKSIZE);
-		threads[index].context.uc_stack.ss_size = STACKSIZE;
+		threads[index].context.uc_stack.ss_sp = STACKSIZE;
+		threads[index].context.uc_stack.ss_size = sizeof(STACKSIZE);
 		threads[index].context.uc_stack.ss_flags = 0;
+		threads[index].context.uc_link = &context_link;
 		threads[index].finished = 0;
+		/* makecontext?? */
 		number_total_threads++;
 		return 1;
 	}
@@ -169,15 +171,18 @@ int gtthread_create(gtthread_t *thread, void *(*start_routine)(void *), void *ar
 int gtthread_mutex_init(gtthread_mutex_t *mutex) {
 	mutex -> lock = 0;
 	mutex -> count = 1;
-	mutex -> unlock = 0;
+	mutex -> owner = 0;
 }
 int gtthread_mutex_lock(gtthread_mutex_t *mutex) {
 	
-	if(mutex->count > 0 && mutex->lock == 0 && mutex->owner == 0) { 
+	if(mutex->count ==  1 && mutex->lock == 0 && mutex->owner == 0) { 
 		mutex->count = 0;
 		mutex->lock = 1;
 		mutex -> owner = threads[current_thread].gtthread_id;
 		while(mutex->count == 0);
+	}
+	else {
+		printf("Cannot use the mutex, currently being used \n");
 	}
 	return 0;
 }
@@ -186,7 +191,7 @@ int gtthread_mutex_unlock(gtthread_mutex_t *mutex) {
 	if(mutex->owner == threads[current_thread]) {
 		mutex->count = 1;
 		mutex -> owner = 0;
-		mutex -> unlock = 0;
+		mutex -> lock  = 0;
 	}
 	return 0;
 }

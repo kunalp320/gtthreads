@@ -73,9 +73,10 @@ void scheduler() {
 
 	if(number_total_threads > 0) {
 		int temp = current_thread;
-			while(threads[current_thread].finished == 1) {
+	/*	while(threads[current_thread].finished == 1) {
 			current_thread = (current_thread+1)%number_total_threads;
-		}
+		}*/
+		current_thread = (current_thread+1)%number_total_threads;
 		swapcontext(&threads[temp].context, &threads[current_thread].context);
 	}
 	return;

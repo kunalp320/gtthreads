@@ -147,7 +147,7 @@ int gtthread_join(gtthread_t thread, void **status) {
 void function_catcher(void *(start_routine)(void *), void *arg) {
 
 	threads[current_thread].return_value = start_routine(arg);
-	int temp = (1+current)%number_total_threads;
+	int temp = (1+current_thread)%number_total_threads;
 	swapcontext(&threads[current_thread].context, &threads[temp].context);
 	return;
 }

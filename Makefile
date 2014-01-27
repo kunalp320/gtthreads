@@ -1,4 +1,4 @@
-d Library Makefile
+#### GTThread Library Makefile
 
 CFLAGS  = -Wall -pedantic
 LFLAGS  =
@@ -9,24 +9,23 @@ RANLIB  = ranlib
 
 LIBRARY = gtthread.a
 
-LIB_SRC = gtthread.c gtthread_sched.c gtthread_mutex.c
+LIB_SRC = gtthread.c
 
 LIB_OBJ = $(patsubst %.c,%.o,$(LIB_SRC))
 
 # pattern rule for object files
-	%.o: %.c
-		$(CC) -c $(CFLAGS) $< -o $@
+%.o: %.c
+	$(CC) -c $(CFLAGS) $< -o $@
 
-		all: $(LIBRARY)
+all: $(LIBRARY)
 
-	$(LIBRARY): $(LIB_OBJ)
-		      	$(AR) $(LIBRARY) $(LIB_OBJ)
-			      	$(RANLIB) $(LIBRARY)
+$(LIBRARY): $(LIB_OBJ)
+	$(AR) $(LIBRARY) $(LIB_OBJ)
+	$(RANLIB) $(LIBRARY)
 
-				     clean:
-				     	$(RM) $(LIBRARY) $(LIB_OBJ)
+clean:
+	$(RM) $(LIBRARY) $(LIB_OBJ)
 
-	.PHONY: depend
-	depend:
-		$(CFLAGS) -- $(LIB_SRC)  2>/dev/null
-
+.PHONY: depend
+depend:
+	$(CFLAGS) -- $(LIB_SRC)  2>/dev/null

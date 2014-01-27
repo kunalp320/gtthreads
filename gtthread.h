@@ -7,9 +7,10 @@ typedef struct {
 
 	int count;
 	int lock;
-	int unlock;
+	int owner;
 
-}gtthread_mutex_t
+}gtthread_mutex_t;
+
 
 /* Must be called before any of the below functions. Failure to do so may
     * result in undefined behavior. 'period' is the scheduling quantum (interval)

@@ -1,9 +1,10 @@
-#include <gtthread.h>
-#include <ucontext.h>
+#include "gtthread.h"
+#include <sys/ucontext.h>
 #include <sys/time.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+#define _XOPEN_SOURCE 600
 #define MAX_THREAD_SIZE 20 /* Number of threads that can co-exist */
 #define STACKSIZE 1024
 
@@ -21,18 +22,22 @@ ucontext_t context_link;
 static int i = 0; /*For loop counter */
 static long quantum;
 struct itimerval timer;
-
+struct sigaction sig;
 static int number_total_threads=0;
 static int current_thread=-1;
 
 /* Not sure what else to do with init */
 /* Does this timer seem proper? */
+void scheduler();
+void schedule_handler();
+void function_catcher();
+void main_context();
 
 void gtthread_init(long period) {
 	quantum = period;
 
 	for(i = 0; i<MAX_THREAD_SIZE; i++) {
-		threads[i].gtthread_id = -1;
+		threads[i].gtthread_id = i+1;
 		threads[i].finished = 0;
 	}
 
@@ -40,26 +45,45 @@ void gtthread_init(long period) {
 	timer.it_value.tv_usec = quantum;
 	timer.it_interval = timer.it_value;
 
-	sa_sigaction = schedule_handler;
-	sa_flags = SA_RESTART | SA_SIGINFO;
-	sigemptyset(&sa_sigaction.sa_mask);
+	sig.sa_sigaction = schedule_handler;
+	sig.sa_flags = SA_RESTART | SA_SIGINFO;
+	sigemptyset(&sig.sa_mask); 
+	sigaction(SIGPROF, &sig, NULL);
+	setitimer(ITIMER_PROF, &timer, NULL);
 
+	/*Create the main thread here */
+	number_total_threads++;
+	current_thread = 0;
+	threads[current_thread].gtthread_id = 1;
+	threads[current_thread].context.uc_stack.ss_sp = malloc(STACKSIZE);
+	threads[current_thread].context.uc_stack.ss_size = sizeof(STACKSIZE);
+	threads[current_thread].context.uc_stack.ss_flags = 0;
+
+	threads[current_thread].finished = 0;
+	makecontext(&threads[current_thread].context, &main_context, 0);
+
+	return;
 
 }
+void main_context() {
+	setcontext(&threads[0].context);
+	return;
+}
 void scheduler() {
+
 	if(number_total_threads > 0) {
 		int temp = current_thread;
-		while(threads[current_thread].finished == 1) {
+			while(threads[current_thread].finished == 1) {
 			current_thread = (current_thread+1)%number_total_threads;
 		}
-		swap_context(&threads[temp].context, &threads[current_thread].context);
+		swapcontext(&threads[temp].context, &threads[current_thread].context);
 	}
 	return;
 
 }
 void schedule_handler() {
 	/*turn off timer while you change threads */
-	timer.it_value = 0;
+	timer.it_value.tv_sec = 0;
 	timer.it_interval = timer.it_value;
 
 	/* need to stop the current thread and begin the next thread */
@@ -67,11 +91,11 @@ void schedule_handler() {
 
 	
 	/*restart the timer */
-	timer.it_value.tv_usec = quantum;
+	timer.it_value.tv_usec = quantum*10;
 	timer.it_interval = timer.it_value;
-	sa_sigaction = schedule_handler;
-	sa_flags = sa_restart | sa_siginfo;
-	sigemptyset(&sa_sigaction.sa_mask);
+	setitimer(ITIMER_PROF, &timer, NULL);
+	return;
+
 
 }
 
@@ -81,87 +105,73 @@ int gtthread_equals(gtthread_t t1, gtthread_t t2) {
 
 /* not sure how to properly exit */
 void gtthread_exit(void *ret_val) {
-	threads[current].return_value = ret_val;
+	threads[current_thread].return_value = ret_val;
 	gtthread_cancel(current_thread);
-	/* setcontext() */
+	makecontext(&threads[(current_thread+1)%number_total_threads]);
 }
 int gtthread_cancel(gtthread_t thread_id) {
 
-	int index = 0;
-	int found = 0;
-	for(i = 0; i<number_total_threads; i++ ) {
-		if(gtthreads[i].thread_id == thread_id) {
-			index = i;
-			found = 1;
-			break;
-		}
-	}
-	if(found) {
-		threads[index].finished = 1;
-		free(threads[index].context.uc_stack.ss_sp);
+	if((int)thread_id < number_total_threads) {
+		threads[(int)thread_id].finished = 1;
+		free(threads[(int)thread_id].context.uc_stack.ss_sp);
 		number_total_threads--;
-		return 1; 
+		return 1;
 	}
 	else {
-		printf("Cannot cancel/exit a thread that does not exit\n");
+		printf("Cannot cancel/exit a thread that does not exist \n");
 		exit(0);
 	}
 	return 0;
+
 }
-gtthread gtthread_self(void) {
-	return  threads[current_thread].gtthread_id;
+gtthread_t gtthread_self(void) {
+	return threads[current_thread].gtthread_id;
 }
 
 int gtthread_join(gtthread_t thread, void **status) {
 
-	int found = 0;
-	int index;
-	for(i = 0; i<number_total_threads; i++) {
-		if(threads[i].gtthread_id == thread) {
-			index = i;
-			found = 1;
-			break;
-		}
-	}
-	if(found && status != NULL) {
-		while(true) {
-			if(threads[index].finished == 1) 
+	if((int)thread < number_total_threads && status != NULL) {
+		while(1) {
+			if(threads[(int)thread].finished == 1)
 				break;
 		}
-		status = threads[index].return_value;
+		status = threads[(int)thread].return_value;
 		return 1;
 	}
 	else {
-		printf("Cannot join a thread that doesn't exit or with a NULL pointer \n");
+		printf("Cannot join a thread that doesn't exist");
 		exit(0);
 	}
 	return 0;
 }
+void function_catcher(void *(start_routine)(void *), void *arg, int current) {
 
+	threads[current].return_value = start_routine(arg);
+	if(current == number_total_threads) {
+		swapcontext(&threads[current].context, &threads[0].context);
+	}
+	else 
+	{
+		swapcontext(&threads[current].context, &threads[current+1].context);
+	}
+	return;
+}
 int gtthread_create(gtthread_t *thread, void *(*start_routine)(void *), void *arg) {
 
-	int index;
-	int possible = 0;
-	for(i = 0; i<number_total_threads; i++) {
-		if(threads[i] != -1) {
-			threads[i].gtthread_id = thread;
-			index = i;
-			possible = 1;
-			break;
-		}
-	}
-	if(possible) {
-		threads[index].context.uc_stack.ss_sp = STACKSIZE;
-		threads[index].context.uc_stack.ss_size = sizeof(STACKSIZE);
-		threads[index].context.uc_stack.ss_flags = 0;
-		threads[index].context.uc_link = &context_link;
-		threads[index].finished = 0;
-		/* makecontext?? */
-		number_total_threads++;
+
+	number_total_threads++;
+	if(number_total_threads < MAX_THREAD_SIZE) {
+		threads[number_total_threads].gtthread_id = number_total_threads;
+		threads[number_total_threads].context.uc_stack.ss_sp = malloc(STACKSIZE);
+		threads[number_total_threads].context.uc_stack.ss_size = sizeof(STACKSIZE);
+		threads[number_total_threads].context.uc_stack.ss_flags = 0;
+	
+		threads[number_total_threads].finished = 0;
+		makecontext(&threads[number_total_threads].context, &function_catcher, 3, &start_routine, arg, number_total_threads);
 		return 1;
 	}
 	else {
-		printf("Cannot create any more threads, have reach thread limit \n");
+		printf("cannot create any more threads, have reach thread limit \n");
 		exit(0);
 	}
 	return 0;
@@ -172,6 +182,7 @@ int gtthread_mutex_init(gtthread_mutex_t *mutex) {
 	mutex -> lock = 0;
 	mutex -> count = 1;
 	mutex -> owner = 0;
+	return 1;
 }
 int gtthread_mutex_lock(gtthread_mutex_t *mutex) {
 	
@@ -188,7 +199,7 @@ int gtthread_mutex_lock(gtthread_mutex_t *mutex) {
 }
 int gtthread_mutex_unlock(gtthread_mutex_t *mutex) {
 	
-	if(mutex->owner == threads[current_thread]) {
+	if(mutex->owner == threads[current_thread].gtthread_id) {
 		mutex->count = 1;
 		mutex -> owner = 0;
 		mutex -> lock  = 0;
@@ -201,3 +212,8 @@ int gtthread_mutex_unlock(gtthread_mutex_t *mutex) {
 
 /* Am I suppose to use get/set context? */
 /* How does everything just switch around? */
+
+/*Go back and use the indexes for the thread id */
+
+/*Call my wrapper function on a gtthread_create */
+/* There i should swap at the end of it to the next thread */

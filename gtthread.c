@@ -144,16 +144,11 @@ int gtthread_join(gtthread_t thread, void **status) {
 	}
 	return 0;
 }
-void function_catcher(void *(start_routine)(void *), void *arg, int current) {
+void function_catcher(void *(start_routine)(void *), void *arg) {
 
-	threads[current].return_value = start_routine(arg);
-	if(current == number_total_threads) {
-		swapcontext(&threads[current].context, &threads[0].context);
-	}
-	else 
-	{
-		swapcontext(&threads[current].context, &threads[current+1].context);
-	}
+	threads[current_thread].return_value = start_routine(arg);
+	int temp = (1+current)%number_total_threads;
+	swapcontext(&threads[current_thread].context, &threads[temp].context);
 	return;
 }
 int gtthread_create(gtthread_t *thread, void *(*start_routine)(void *), void *arg) {
@@ -167,7 +162,7 @@ int gtthread_create(gtthread_t *thread, void *(*start_routine)(void *), void *ar
 		threads[number_total_threads].context.uc_stack.ss_flags = 0;
 	
 		threads[number_total_threads].finished = 0;
-		makecontext(&threads[number_total_threads].context, &function_catcher, 3, &start_routine, arg, number_total_threads);
+		makecontext(&threads[number_total_threads].context, &function_catcher, 2, &start_routine, arg);
 		return 1;
 	}
 	else {

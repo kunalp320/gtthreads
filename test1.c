@@ -6,6 +6,7 @@
       Should print "Hello World!" */
 
 void *thr1(void *in) {
+	printf("is it even in here??\n");
 	    printf("Hello World!\n");
 	        fflush(stdout);
 		    return NULL;

@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define _XOPEN_SOURCE 600
+
 #define MAX_THREAD_SIZE 20 /* Number of threads that can co-exist */
 #define STACKSIZE 1024
 
@@ -30,14 +30,14 @@ static int current_thread=-1;
 /* Does this timer seem proper? */
 void scheduler();
 void schedule_handler();
-void function_catcher();
-void main_context();
+static void function_catcher();
+static void main_context();
 
 void gtthread_init(long period) {
 	quantum = period;
 
 	for(i = 0; i<MAX_THREAD_SIZE; i++) {
-		threads[i].gtthread_id = i+1;
+		threads[i].gtthread_id = (i);
 		threads[i].finished = 0;
 	}
 
@@ -54,29 +54,35 @@ void gtthread_init(long period) {
 	/*Create the main thread here */
 	number_total_threads++;
 	current_thread = 0;
-	threads[current_thread].gtthread_id = 1;
+
+	getcontext(&threads[current_thread].context);
 	threads[current_thread].context.uc_stack.ss_sp = malloc(STACKSIZE);
 	threads[current_thread].context.uc_stack.ss_size = sizeof(STACKSIZE);
 	threads[current_thread].context.uc_stack.ss_flags = 0;
-
+	threads[current_thread].context.uc_link = &context_link;
 	threads[current_thread].finished = 0;
+
 	makecontext(&threads[current_thread].context, &main_context, 0);
+/*	getcontext(&threads[current_thread].context); */
 
 	return;
 
 }
-void main_context() {
+static void main_context() {
+	printf("here\n");
 	setcontext(&threads[0].context);
 	return;
 }
 void scheduler() {
 
+	printf("scheduler()\n");
 	if(number_total_threads > 0) {
 		int temp = current_thread;
 	/*	while(threads[current_thread].finished == 1) {
 			current_thread = (current_thread+1)%number_total_threads;
 		}*/
-		current_thread = (current_thread+1)%number_total_threads;
+		current_thread = (++current_thread)%number_total_threads;
+		printf("scheduler\n");
 		swapcontext(&threads[temp].context, &threads[current_thread].context);
 	}
 	return;
@@ -92,7 +98,7 @@ void schedule_handler() {
 
 	
 	/*restart the timer */
-	timer.it_value.tv_usec = quantum*10;
+	timer.it_value.tv_usec = quantum;
 	timer.it_interval = timer.it_value;
 	setitimer(ITIMER_PROF, &timer, NULL);
 	return;
@@ -145,11 +151,15 @@ int gtthread_join(gtthread_t thread, void **status) {
 	}
 	return 0;
 }
-void function_catcher(void *(start_routine)(void *), void *arg) {
+static void function_catcher(void *(start_routine)(), void *arg) {
 
+	printf("function catch erhere\n");
 	threads[current_thread].return_value = start_routine(arg);
 	int temp = (1+current_thread)%number_total_threads;
+	printf("middle\n");
+	gtthread_cancel(threads[current_thread].gtthread_id);
 	swapcontext(&threads[current_thread].context, &threads[temp].context);
+	printf("end of function catcher\n");
 	return;
 }
 int gtthread_create(gtthread_t *thread, void *(*start_routine)(void *), void *arg) {
@@ -157,18 +167,18 @@ int gtthread_create(gtthread_t *thread, void *(*start_routine)(void *), void *ar
 
 	number_total_threads++;
 	if(number_total_threads < MAX_THREAD_SIZE) {
-		threads[number_total_threads].gtthread_id = number_total_threads;
+	
 		threads[number_total_threads].context.uc_stack.ss_sp = malloc(STACKSIZE);
 		threads[number_total_threads].context.uc_stack.ss_size = sizeof(STACKSIZE);
 		threads[number_total_threads].context.uc_stack.ss_flags = 0;
-	
+		threads[number_total_threads].context.uc_link = &context_link;
 		threads[number_total_threads].finished = 0;
 		makecontext(&threads[number_total_threads].context, &function_catcher, 2, &start_routine, arg);
 		return 1;
 	}
 	else {
 		printf("cannot create any more threads, have reach thread limit \n");
-		exit(0);
+		exit(1);
 	}
 	return 0;
 }
@@ -183,8 +193,8 @@ int gtthread_mutex_init(gtthread_mutex_t *mutex) {
 int gtthread_mutex_lock(gtthread_mutex_t *mutex) {
 	
 	if(mutex->count ==  1 && mutex->lock == 0 && mutex->owner == 0) { 
-		mutex->count = 0;
-		mutex->lock = 1;
+		mutex -> count = 0;
+		mutex -> lock = 1;
 		mutex -> owner = threads[current_thread].gtthread_id;
 		while(mutex->count == 0);
 	}
@@ -195,8 +205,8 @@ int gtthread_mutex_lock(gtthread_mutex_t *mutex) {
 }
 int gtthread_mutex_unlock(gtthread_mutex_t *mutex) {
 	
-	if(mutex->owner == threads[current_thread].gtthread_id) {
-		mutex->count = 1;
+	if(mutex -> owner == threads[current_thread].gtthread_id) {
+		mutex -> count = 1;
 		mutex -> owner = 0;
 		mutex -> lock  = 0;
 	}

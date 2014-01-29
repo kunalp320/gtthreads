@@ -72,7 +72,7 @@ void scheduler() {
 
 		if(number_total_threads > 1)  
 			swapcontext(&threads[temp].context, &threads[current_thread].context);
-		lse {
+		else {
 			setcontext(&threads[0].context);
 		}
 	}
@@ -103,13 +103,14 @@ int gtthread_equals(gtthread_t t1, gtthread_t t2) {
 
 /* not sure how to properly exit */
 void gtthread_exit(void *ret_val) {
-	threads[current_thread].return_value = ret_val;
+	threads[current_thread].return_value = &ret_val;
 	gtthread_cancel(current_thread);
-	makecontext(&threads[(current_thread+1)%number_total_threads]);
+	scheduler();
 }
 int gtthread_cancel(gtthread_t thread_id) {
 
 	if((int)thread_id < number_total_threads) {
+	
 		threads[(int)thread_id].finished = 1;
 		free(threads[(int)thread_id].context.uc_stack.ss_sp); 
 		number_total_threads--;
@@ -127,7 +128,7 @@ gtthread_t gtthread_self(void) {
 }
 
 int gtthread_join(gtthread_t thread, void **status) {
-
+	
 	if((int)thread < number_total_threads && status != NULL) {
 		while(1) {
 			if(threads[(int)thread].finished == 1)
@@ -146,9 +147,9 @@ static void function_catcher(void *(*start_routine)(void *), void *arg) {
 
 
 	threads[current_thread].return_value = start_routine(arg);
+	threads[current_thread].finished = 1;
 	int temp = (1+current_thread)%number_total_threads;
 
-	gtthread_cancel(threads[current_thread].gtthread_id);
 	swapcontext(&threads[current_thread].context, &threads[temp].context);
 	current_thread = temp;
 	return;
@@ -159,10 +160,10 @@ int gtthread_create(gtthread_t *thread, void *(*start_routine)(void *), void *ar
 	number_total_threads++;
 	if(number_total_threads < MAX_THREAD_SIZE) {
 		int new_thread = number_total_threads-1;
-	
 
 		getcontext(&threads[new_thread].context);
-
+	
+		*thread = threads[new_thread].gtthread_id;
 		threads[new_thread].context.uc_stack.ss_sp = malloc(STACKSIZE);
 		threads[new_thread].context.uc_stack.ss_size = (STACKSIZE);
 		threads[new_thread].context.uc_stack.ss_flags = 0;

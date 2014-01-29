@@ -66,8 +66,7 @@ void scheduler() {
 
 	if(number_total_threads > 0) {
 		int temp = current_thread;
-	/*	while(threads[current_thread].finished == 1) { */
-			current_thread = (++current_thread)%number_total_threads;
+		current_thread = (++current_thread)%number_total_threads;
 		
 
 		if(number_total_threads > 1)  
@@ -103,25 +102,20 @@ int gtthread_equals(gtthread_t t1, gtthread_t t2) {
 
 /* not sure how to properly exit */
 void gtthread_exit(void *ret_val) {
-	threads[current_thread].return_value = &ret_val;
-	gtthread_cancel(current_thread);
+	threads[current_thread].return_value = ret_val;
+	gtthread_cancel(threads[current_thread].gtthread_id);
 	scheduler();
 }
 int gtthread_cancel(gtthread_t thread_id) {
 
-	if((int)thread_id < number_total_threads) {
 	
-		threads[(int)thread_id].finished = 1;
-		free(threads[(int)thread_id].context.uc_stack.ss_sp); 
-		number_total_threads--;
-		return 1;
+	threads[(int)thread_id].finished = 1;
+	free(threads[(int)thread_id].context.uc_stack.ss_sp);
+	for(i = (int)thread_id; i<number_total_threads-1; i++) {
+		threads[i] = threads[i+1];
 	}
-	else {
-		printf("Cannot cancel/exit a thread that does not exist \n");
-		exit(0);
-	}
-	return 0;
-
+	number_total_threads--;
+	setcontext(&threads[current_thread].context);
 }
 gtthread_t gtthread_self(void) {
 	return threads[current_thread].gtthread_id;
@@ -148,9 +142,8 @@ static void function_catcher(void *(*start_routine)(void *), void *arg) {
 
 	threads[current_thread].return_value = start_routine(arg);
 	threads[current_thread].finished = 1;
-	int temp = (1+current_thread)%number_total_threads;
-
-	swapcontext(&threads[current_thread].context, &threads[temp].context);
+	int temp = (++current_thread)%number_total_threads;
+	setcontext(&threads[temp].context);
 	current_thread = temp;
 	return;
 }

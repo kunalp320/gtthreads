@@ -65,9 +65,7 @@ void gtthread_init(long period) {
 void scheduler() {
 
         if(number_total_threads > 0) {
-                int temp = current_thread;
-		
-			current_thread = (++current_thread)%number_total_threads;
+             	current_thread = (++current_thread)%number_total_threads;
 		printf("curre%d\n", current_thread);
 
                 if(number_total_threads > 1)
@@ -153,11 +151,10 @@ static void function_catcher(void *(*start_routine)(void *), void *arg) {
         threads[current_thread].return_value = start_routine(arg);
         threads[current_thread].finished = 1;
 	gtthread_cancel(threads[current_thread].gtthread_id);
-        int temp = (++current_thread)%number_total_threads;
+        current_thread  = (++current_thread)%number_total_threads;
 
-        setcontext(&threads[temp].context);
-        current_thread = temp;
-	return;
+        setcontext(&threads[current_thread].context);
+  	return;
 }
 int gtthread_create(gtthread_t *thread, void *(*start_routine)(void *), void *arg) {
 

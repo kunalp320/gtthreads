@@ -135,11 +135,17 @@ int gtthread_join(gtthread_t thread, void **status) {
 	printf("thread id: %d\n", thread);
 	printf("number total %d\n", number_total_threads);
         if((int)thread < number_total_threads && status != NULL) {
+		timer.it_value.tv_sec = 0;
+		timer.it_interval = timer.it_value;
+
                 while(1) {
                         if(threads[(int)thread].finished == 1)
                                 break;
                 }
                 status = threads[(int)thread].return_value;
+		timer.it_value.tv_usec = quantum;
+		timer.it_interval = timer.it_value;
+		setitimer(ITIMER_PROF, &timer, NULL);
                 return 1;
         }
         else {

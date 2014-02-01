@@ -98,7 +98,10 @@ void schedule_handler() {
 int gtthread_equals(gtthread_t t1, gtthread_t t2) {
         return t1==t2 ? 1:0;
 }
-
+int gtthread_yield(void) {
+	swapcontext(&threads[current_thread].context, &context_link);
+	return 1;
+}
 /* not sure how to properly exit */
 void gtthread_exit(void *ret_val) {
         threads[current_thread].return_value = ret_val;

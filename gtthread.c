@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 
-#define MAX_THREAD_SIZE 20 /*Number of threads that can co-exist */
+#define MAX_THREAD_SIZE 150 /*Number of threads that can co-exist */
 #define STACKSIZE 1024
 
 typedef struct {
@@ -26,6 +26,7 @@ struct sigaction sig;
 static int number_total_threads=0;
 static int current_thread=-1;
 
+
 /* Not sure what else to do with init */
 /* Does this timer seem proper? */
 void scheduler();
@@ -39,6 +40,7 @@ void gtthread_init(long period) {
         for(i = 0; i<MAX_THREAD_SIZE; i++) {
                 threads[i].gtthread_id = i;
                 threads[i].finished = 0;
+	      
 
         }
 
@@ -48,7 +50,7 @@ void gtthread_init(long period) {
         current_thread = 0;
 
         getcontext(&threads[current_thread].context);
-
+       
         timer.it_value.tv_sec = 0;
         timer.it_value.tv_usec = quantum;
         sig.sa_sigaction = schedule_handler;
@@ -66,7 +68,7 @@ void scheduler() {
 
         if(number_total_threads > 0) {
              	current_thread = (++current_thread)%number_total_threads;
-		printf("curre%d\n", current_thread);
+	   
 
                 if(number_total_threads > 1)
                         swapcontext(&context_link, &threads[current_thread].context);
@@ -74,6 +76,9 @@ void scheduler() {
                         setcontext(&threads[0].context);
                 }
         }
+	if(threads[0].finished == 1) {
+	  exit(0);
+	}
         return;
 
 }
@@ -99,14 +104,25 @@ int gtthread_equals(gtthread_t t1, gtthread_t t2) {
         return t1==t2 ? 1:0;
 }
 int gtthread_yield(void) {
+        timer.it_value.tv_sec = 0;
+	timer.it_interval = timer.it_value;
+
 	swapcontext(&threads[current_thread].context, &context_link);
+
+	timer.it_value.tv_usec = quantum;
+	timer.it_interval = timer.it_value;
+	setitimer(ITIMER_PROF, &timer, NULL);
 	return 1;
 }
 /* not sure how to properly exit */
 void gtthread_exit(void *ret_val) {
+  
         threads[current_thread].return_value = ret_val;
         gtthread_cancel(threads[current_thread].gtthread_id);
-        setcontext(&context_link);
+	if(current_thread == 0) {
+	  exit(1);
+	}
+        scheduler();
 }
 int gtthread_cancel(gtthread_t thread_id) {
 
@@ -119,7 +135,9 @@ int gtthread_cancel(gtthread_t thread_id) {
 			threads[i].gtthread_id = i;
 		}
 		number_total_threads--;
-
+		if(number_total_threads == 0) {
+		  exit(0);
+		}
 		return 0;
 	}
 	else {
@@ -132,20 +150,20 @@ int gtthread_cancel(gtthread_t thread_id) {
 
 int gtthread_join(gtthread_t thread, void **status) {
         
-	printf("thread id: %d\n", thread);
-	printf("number total %d\n", number_total_threads);
-        if((int)thread < number_total_threads && status != NULL) {
+	
+        if((int)thread < number_total_threads) {
 		timer.it_value.tv_sec = 0;
 		timer.it_interval = timer.it_value;
+		swapcontext(&threads[current_thread].context, &threads[(int)thread].context);
+		
 
-                while(1) {
-                        if(threads[(int)thread].finished == 1)
-                                break;
-                }
-                status = threads[(int)thread].return_value;
-		timer.it_value.tv_usec = quantum;
+                while(threads[current_thread].finished != 1);
+		if(status != NULL) {
+		  status = &threads[(int)thread].return_value;
+		}
+	       	timer.it_value.tv_usec = quantum;
 		timer.it_interval = timer.it_value;
-		setitimer(ITIMER_PROF, &timer, NULL);
+		setitimer(ITIMER_PROF, &timer, NULL); 
                 return 1;
         }
         else {
@@ -160,6 +178,7 @@ static void function_catcher(void *(*start_routine)(void *), void *arg) {
         threads[current_thread].return_value = start_routine(arg);
         threads[current_thread].finished = 1;
 	gtthread_cancel(threads[current_thread].gtthread_id);
+	
         current_thread  = (++current_thread)%number_total_threads;
 
         setcontext(&threads[current_thread].context);
@@ -192,7 +211,10 @@ int gtthread_create(gtthread_t *thread, void *(*start_routine)(void *), void *ar
         return 0;
 }
 
-
+gtthread_t gtthread_self(void) {
+  gtthread_t toReturn =  threads[current_thread].gtthread_id;
+       return toReturn;
+}
 int gtthread_mutex_init(gtthread_mutex_t *mutex) {
         mutex -> lock = 0;
         mutex -> count = 1;

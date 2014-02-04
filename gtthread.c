@@ -1,12 +1,12 @@
 #include "gtthread.h"
-#include <sys/ucontext.h>
+#include <ucontext.h>
 #include <sys/time.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 
 #define MAX_THREAD_SIZE 150 /*Number of threads that can co-exist */
-#define STACKSIZE 1024
+#define STACKSIZE 1024*1024
 
 typedef struct {
         gtthread_t gtthread_id;
@@ -64,20 +64,23 @@ void scheduler() {
 
         if(number_total_threads > 0) {
 	        int temp = current_thread;
-		current_thread = (++current_thread)%number_total_threads;
+		current_thread = (current_thread+1)%number_total_threads;
 
 		while(threads[current_thread].finished == 1) {
-			current_thread = (++current_thread)%number_total_threads;
+			current_thread = (current_thread+1)%number_total_threads;
 		}
-	       		  
+	
+		timer.it_value.tv_sec = 0;
+        	timer.it_value.tv_usec = quantum;
+   
+        	setitimer(ITIMER_PROF, &timer, NULL);
+	  
 	       
 		  if(number_total_threads > 1) {
 			
                         swapcontext(&threads[temp].context, &threads[current_thread].context);
 		  }
-                else {
-                        setcontext(&threads[0].context);
-                } 
+                
         }
 	if(threads[0].finished == 1) {
 	  exit(0);
@@ -113,10 +116,12 @@ void gtthread_exit(void *ret_val) {
 
         threads[current_thread].return_value = ret_val;
 	threads[current_thread].finished = 1;
+
         /*gtthread_cancel(threads[current_thread].gtthread_id); */
 	if(current_thread == 0) {
 	  exit(1);
 	}
+	gtthread_yield();
         
 }
 int gtthread_cancel(gtthread_t thread_id) {
@@ -131,8 +136,7 @@ int gtthread_cancel(gtthread_t thread_id) {
 	if(index != -1) {
 
 		threads[index].finished = 1;
-		finished_threads[finish_curr] = threads[index];
-		finish_curr++;
+	
 		free(threads[index].context.uc_stack.ss_sp);
 	       
 		for(i = index; i<number_total_threads-1; i++) {
@@ -185,10 +189,7 @@ static void function_catcher(void *(*start_routine)(void *), void *arg) {
 		threads[current_thread].return_value = ans;
 		threads[current_thread].finished = 1;
 	}
-    
-       /* threads[current_thread].finished = 1; */
-/*	gtthread_cancel(threads[current_thread].gtthread_id);  */
-	setcontext(&threads[0].context);
+	schedule_handler();
 	
 }
 int gtthread_create(gtthread_t *thread, void *(*start_routine)(void *), void *arg) {
@@ -198,13 +199,13 @@ int gtthread_create(gtthread_t *thread, void *(*start_routine)(void *), void *ar
         if(number_total_threads < MAX_THREAD_SIZE) {
                 int new_thread = number_total_threads-1;
 
-                getcontext(&threads[new_thread].context);
+                getcontext(&threads[new_thread].context); 
         
                 *thread = threads[new_thread].gtthread_id;
                 threads[new_thread].context.uc_stack.ss_sp = malloc(STACKSIZE);
                 threads[new_thread].context.uc_stack.ss_size = (STACKSIZE);
                 threads[new_thread].context.uc_stack.ss_flags = 0;
-                threads[new_thread].context.uc_link = &threads[0].context; 
+            /*    threads[new_thread].context.uc_link = &threads[0].context; */
                 threads[new_thread].finished = 0;
                 makecontext(&threads[new_thread].context, function_catcher, 2, start_routine, arg);
         

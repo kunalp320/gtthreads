@@ -10,7 +10,7 @@ void *thr1(void *in) {
 	    printf("Hello World!\n");
 	        fflush(stdout);
 		    gtthread_exit((void*)5);
-return;
+return (void*)1;
 }
 void *thr2(void*in) {
 	printf("Thread2\n");

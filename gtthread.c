@@ -69,11 +69,11 @@ void scheduler() {
 		while(threads[current_thread].finished == 1) {
 			current_thread = (current_thread+1)%number_total_threads;
 		}
-	
-		timer.it_value.tv_sec = 0;
+
+	       	timer.it_value.tv_sec = 0;
         	timer.it_value.tv_usec = quantum;
    
-        	setitimer(ITIMER_PROF, &timer, NULL);
+  	      	setitimer(ITIMER_PROF, &timer, NULL);
 	  
 	       
 		  if(number_total_threads > 1) {
@@ -109,19 +109,20 @@ int gtthread_equals(gtthread_t t1, gtthread_t t2) {
         return t1==t2 ? 1:0;
 }
 int gtthread_yield(void) {
+       
        schedule_handler();
+	return 0;
 }
 /* not sure how to properly exit */
 void gtthread_exit(void *ret_val) {
 
         threads[current_thread].return_value = ret_val;
 	threads[current_thread].finished = 1;
-
-        /*gtthread_cancel(threads[current_thread].gtthread_id); */
+	gtthread_yield();
+        
 	if(current_thread == 0) {
 	  exit(1);
 	}
-	gtthread_yield();
         
 }
 int gtthread_cancel(gtthread_t thread_id) {
@@ -172,8 +173,6 @@ int gtthread_join(gtthread_t thread, void **status) {
 		   *status = threads[index].return_value;
 		}
 		
-
-	       	/*gtthread_cancel(index); */
                 return 0;
         }
         else {
@@ -189,7 +188,7 @@ static void function_catcher(void *(*start_routine)(void *), void *arg) {
 		threads[current_thread].return_value = ans;
 		threads[current_thread].finished = 1;
 	}
-	schedule_handler();
+   	schedule_handler();
 	
 }
 int gtthread_create(gtthread_t *thread, void *(*start_routine)(void *), void *arg) {
@@ -205,7 +204,6 @@ int gtthread_create(gtthread_t *thread, void *(*start_routine)(void *), void *ar
                 threads[new_thread].context.uc_stack.ss_sp = malloc(STACKSIZE);
                 threads[new_thread].context.uc_stack.ss_size = (STACKSIZE);
                 threads[new_thread].context.uc_stack.ss_flags = 0;
-            /*    threads[new_thread].context.uc_link = &threads[0].context; */
                 threads[new_thread].finished = 0;
                 makecontext(&threads[new_thread].context, function_catcher, 2, start_routine, arg);
         
@@ -227,27 +225,29 @@ gtthread_t gtthread_self(void) {
 int gtthread_mutex_init(gtthread_mutex_t *mutex) {
         mutex -> lock = 0;
         mutex -> count = 1;
-        mutex -> owner = 0;
+        mutex -> owner = -1;
         return 0;
 }
 int gtthread_mutex_lock(gtthread_mutex_t *mutex) {
         
-        if(mutex->count == 1 && mutex->lock == 0 && mutex->owner == 0) {
+        if(mutex->count == 1 && mutex->lock == 0 && mutex->owner == -1) {
                 mutex -> count = 0;
                 mutex -> lock = 1;
                 mutex -> owner = threads[current_thread].gtthread_id;
-                while(mutex->count == 0);
+             
         }
-        else {
-                printf("Cannot use the mutex, currently being used \n");
-        }
+	else {
+		while(mutex -> count == 0 && mutex -> lock == 1);
+		gtthread_mutex_lock(mutex);
+	}
+    
         return 0;
 }
 int gtthread_mutex_unlock(gtthread_mutex_t *mutex) {
         
-        if(mutex -> owner == threads[current_thread].gtthread_id) {
+        if(mutex -> owner == threads[current_thread].gtthread_id && mutex -> lock == 1) {
                 mutex -> count = 1;
-                mutex -> owner = 0;
+                mutex -> owner = -1;
                 mutex -> lock = 0;
         }
         return 0;

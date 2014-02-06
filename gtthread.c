@@ -76,8 +76,7 @@ void scheduler() {
   	      	setitimer(ITIMER_PROF, &timer, NULL);
 	  
 	       
-		  if(number_total_threads > 1) {
-			
+		  if(number_total_threads > 1) {	
                         swapcontext(&threads[temp].context, &threads[current_thread].context);
 		  }
                 

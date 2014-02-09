@@ -167,7 +167,9 @@ int gtthread_join(gtthread_t thread, void **status) {
   
   	if(index != -1) {        
 	
-                while(threads[index].finished != 1);
+                while(threads[index].finished != 1) {
+			gtthread_yield();
+		}
 		if(status != NULL) {	
 		   *status = threads[index].return_value;
 		}

@@ -26,14 +26,13 @@ int main(void) {
 	while(1);
 
 }
-int eat(int num) {
+void eat(int num) {
 	if(state[num] == HUNGRY && state[(num+4)%N] != EATING && state[(num+1)%N] != EATING) {
 		printf("Philosphor %d is eating\n", num+1);
 		state[num] = EATING;
 		printf("Philosopher %d picked up chopsticks %d and %d \n", (num+1), (num+5)%N, (num+1)%N);
-		return 1;
 	}
-	return 0;
+	
 }
 void* main_loop(void* phil) {
 
@@ -52,10 +51,7 @@ void hungry(int phil) {
 	printf("Philosopher %d is hungry \n", phil+1);
 	for(i = 0; i<99999999; i++);
 
-	int a = eat(phil);
-	
-	while(a != 1) 
-		eat(phil);
+	eat(phil);
 	gtthread_mutex_unlock(&g_mutex);
 }
 void think(int phil) {
